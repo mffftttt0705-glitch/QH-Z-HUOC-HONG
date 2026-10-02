@@ -1,4 +1,3 @@
-
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -39,31 +38,26 @@ export async function onRequestPost(context) {
       ...messages.slice(-16),
     ];
 
-    // 原 @cf/meta/llama-3.1-8b-instruct 已于 2026-05-30 弃用
-    // 主模型：glm-4.7-flash（中文友好、推荐替代）；失败时 fallback 到 llama-3.1-8b-instruct-fast
+    // 原 llama-3.1-8b-instruct 已弃用；主用 glm-4.7-flash，失败回退 llama-fast
     let response;
+    let usedModel = "glm";
     try {
       response = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
         messages: fullMessages,
-        max_tokens: 400,
+        max_tokens: 256,
         temperature: 0.75,
       });
     } catch (e) {
-      console.warn("glm failed, fallback to llama-fast", e);
+      console.warn("glm failed, fallback to llama-fast", e?.message || e);
+      usedModel = "llama-fast";
       response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
         messages: fullMessages,
-        max_tokens: 400,
+        max_tokens: 256,
         temperature: 0.75,
       });
     }
 
-    let reply = "";
-    if (typeof response === "string") reply = response;
-    else if (response?.response) reply = response.response;
-    else if (response?.result) reply = response.result;
-    else if (response?.choices?.[0]?.message?.content) reply = response.choices[0].message.content;
-    else reply = JSON.stringify(response);
-
+    const reply = extractReply(response);
     const changes = {};
     const m = reply.match(/\[CHANGE_OUTFIT:([a-z]+)\]/i);
     if (m) changes.outfit = m[1].toLowerCase();
@@ -80,6 +74,47 @@ export async function onRequestPost(context) {
       error: "AI 调用失败: " + (err.message || String(err))
     }, 500, cors);
   }
+}
+
+/** 兼容多种 Workers AI 返回结构，只取纯文本，绝不把 usage/JSON 整段返回 */
+function extractReply(response) {
+  if (response == null) return "";
+  if (typeof response === "string") return response.trim();
+
+  // 常见字段（按优先级）
+  const candidates = [
+    response.response,
+    response.result?.response,
+    response.result,
+    response.output_text,
+    response.text,
+    response.content,
+    response.message?.content,
+    response.choices?.[0]?.message?.content,
+    response.choices?.[0]?.text,
+    response.choices?.[0]?.delta?.content,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+    // 有的模型 content 是数组：[{type:"text", text:"..."}]
+    if (Array.isArray(c)) {
+      const text = c
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part.text === "string") return part.text;
+          if (part && typeof part.content === "string") return part.content;
+          return "";
+        })
+        .join("")
+        .trim();
+      if (text) return text;
+    }
+  }
+
+  // 最后兜底：若对象里有明显的对话文本字段再取，否则给友好提示（不要 stringify 整包 usage）
+  console.warn("extractReply: unknown shape", JSON.stringify(response).slice(0, 500));
+  return "小云脑子有点懵，再说一遍好不好～";
 }
 
 function describeAppearance(state) {
