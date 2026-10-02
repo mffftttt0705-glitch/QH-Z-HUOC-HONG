@@ -24,3 +24,19 @@
    - **生产分支**：`main`（或你的默认分支）
    - Cloudflare 会自动识别根目录的 `wrangler.toml`
 5. 部署完成后，会得到类似链接：
+6. 打开链接就能用（含 AI 对话）
+
+> 首次部署后，在 Worker 设置里确认 **AI** 绑定已启用（`wrangler.toml` 里已写好 `[ai] binding = "AI"`）。
+
+### 3. 以后更新
+只要往 GitHub 推送代码，Cloudflare 会自动重新部署。
+
+---
+
+## 方式二：本地命令行部署
+
+```bash
+cd desktop-pet-ai
+npm install
+npx wrangler login
+npx wrangler deploy
