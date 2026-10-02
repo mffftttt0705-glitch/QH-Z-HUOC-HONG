@@ -1,3 +1,4 @@
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -38,16 +39,29 @@ export async function onRequestPost(context) {
       ...messages.slice(-16),
     ];
 
-    const response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-      messages: fullMessages,
-      max_tokens: 400,
-      temperature: 0.75,
-    });
+    // 原 @cf/meta/llama-3.1-8b-instruct 已于 2026-05-30 弃用
+    // 主模型：glm-4.7-flash（中文友好、推荐替代）；失败时 fallback 到 llama-3.1-8b-instruct-fast
+    let response;
+    try {
+      response = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
+        messages: fullMessages,
+        max_tokens: 400,
+        temperature: 0.75,
+      });
+    } catch (e) {
+      console.warn("glm failed, fallback to llama-fast", e);
+      response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
+        messages: fullMessages,
+        max_tokens: 400,
+        temperature: 0.75,
+      });
+    }
 
     let reply = "";
     if (typeof response === "string") reply = response;
     else if (response?.response) reply = response.response;
     else if (response?.result) reply = response.result;
+    else if (response?.choices?.[0]?.message?.content) reply = response.choices[0].message.content;
     else reply = JSON.stringify(response);
 
     const changes = {};
