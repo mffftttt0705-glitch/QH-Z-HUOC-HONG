@@ -1,28 +1,52 @@
-export async function onRequestPost(context) {
-  const { request, env } = context;
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
-  const cors = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-
+export async function onRequest(context) {
+  const { request } = context;
   if (request.method === "OPTIONS") {
-    return new Response(null, { headers: cors });
+    return new Response(null, { status: 204, headers: cors });
   }
+  if (request.method === "GET") {
+    return json({ ok: true, service: "xiaoyun-chat", tip: "POST messages to chat" }, 200);
+  }
+  if (request.method === "POST") {
+    return handleChat(context);
+  }
+  return json({ error: "Method not allowed" }, 405);
+}
+
+export async function onRequestPost(context) {
+  return handleChat(context);
+}
+
+export async function onRequestOptions() {
+  return new Response(null, { status: 204, headers: cors });
+}
+
+async function handleChat(context) {
+  const { request, env } = context;
 
   try {
     if (!env.AI) {
       return json({
-        error: "AI 未绑定。请到 Pages 项目 → 设置 → 函数 → 绑定，添加 Workers AI，变量名填 AI，然后重新部署。"
-      }, 500, cors);
+        error: "AI 未绑定。请到 Cloudflare Pages → 设置 → 函数 → 绑定，添加 Workers AI，变量名填 AI，然后重新部署。"
+      }, 500);
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "请求体不是有效 JSON" }, 400);
+    }
+
     const { messages, petState } = body || {};
 
     if (!messages || !Array.isArray(messages)) {
-      return json({ error: "messages 格式错误" }, 400, cors);
+      return json({ error: "messages 格式错误，需要数组" }, 400);
     }
 
     const appearanceDesc = describeAppearance(petState || {});
@@ -38,23 +62,26 @@ export async function onRequestPost(context) {
       ...messages.slice(-16),
     ];
 
-    // 原 llama-3.1-8b-instruct 已弃用；主用 glm-4.7-flash，失败回退 llama-fast
     let response;
-    let usedModel = "glm";
     try {
       response = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
         messages: fullMessages,
         max_tokens: 256,
         temperature: 0.75,
       });
-    } catch (e) {
-      console.warn("glm failed, fallback to llama-fast", e?.message || e);
-      usedModel = "llama-fast";
-      response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
-        messages: fullMessages,
-        max_tokens: 256,
-        temperature: 0.75,
-      });
+    } catch (e1) {
+      console.warn("glm failed, try llama-fast", e1?.message || e1);
+      try {
+        response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast", {
+          messages: fullMessages,
+          max_tokens: 256,
+          temperature: 0.75,
+        });
+      } catch (e2) {
+        return json({
+          error: "AI 调用失败: " + (e2?.message || e1?.message || String(e2))
+        }, 500);
+      }
     }
 
     const reply = extractReply(response);
@@ -67,21 +94,19 @@ export async function onRequestPost(context) {
     return json({
       reply: cleanReply || "嗯嗯，我在听哦～",
       changes,
-    }, 200, cors);
+    }, 200);
   } catch (err) {
     console.error(err);
     return json({
-      error: "AI 调用失败: " + (err.message || String(err))
-    }, 500, cors);
+      error: "服务器错误: " + (err.message || String(err))
+    }, 500);
   }
 }
 
-/** 兼容多种 Workers AI 返回结构，只取纯文本，绝不把 usage/JSON 整段返回 */
 function extractReply(response) {
   if (response == null) return "";
   if (typeof response === "string") return response.trim();
 
-  // 常见字段（按优先级）
   const candidates = [
     response.response,
     response.result?.response,
@@ -97,7 +122,6 @@ function extractReply(response) {
 
   for (const c of candidates) {
     if (typeof c === "string" && c.trim()) return c.trim();
-    // 有的模型 content 是数组：[{type:"text", text:"..."}]
     if (Array.isArray(c)) {
       const text = c
         .map((part) => {
@@ -112,8 +136,7 @@ function extractReply(response) {
     }
   }
 
-  // 最后兜底：若对象里有明显的对话文本字段再取，否则给友好提示（不要 stringify 整包 usage）
-  console.warn("extractReply: unknown shape", JSON.stringify(response).slice(0, 500));
+  console.warn("extractReply unknown shape", JSON.stringify(response).slice(0, 400));
   return "小云脑子有点懵，再说一遍好不好～";
 }
 
@@ -122,7 +145,7 @@ function describeAppearance(state) {
   return `服装=${map[state?.outfit] || "校服"}`;
 }
 
-function json(data, status = 200, cors = {}) {
+function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json", ...cors },
