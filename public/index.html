@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#a78bfa" />
+  <meta name="description" content="小云 - Cloudflare 桌宠 AI，可捏脸换装、自由拖拽、智能对话" />
+  <title>小云 · 桌宠 AI</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>" />
+</head>
+<body>
+  <!-- 背景装饰 -->
+  <div class="bg-decor">
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+    <div class="cloud c3"></div>
+  </div>
+
+  <!-- 桌宠主体（可拖拽） -->
+  <div id="pet" class="pet" title="拖我移动 · 点击互动 · 右键菜单">
+    <div class="pet-body">
+      <!-- 头发层 -->
+      <div class="layer hair" id="hair"></div>
+      <!-- 身体/衣服 -->
+      <div class="layer body" id="body"></div>
+      <!-- 脸 -->
+      <div class="layer face">
+        <div class="eyes" id="eyes"></div>
+        <div class="mouth" id="mouth"></div>
+        <div class="blush left"></div>
+        <div class="blush right"></div>
+      </div>
+      <!-- 配饰 -->
+      <div class="layer accessory" id="accessory"></div>
+    </div>
+    <!-- 对话气泡 -->
+    <div id="bubble" class="bubble hidden"></div>
+  </div>
+
+  <!-- 右键 / 控制面板 -->
+  <div id="panel" class="panel hidden">
+    <div class="panel-header">
+      <span>☁️ 小云的衣柜</span>
+      <button id="close-panel" class="btn-icon">✕</button>
+    </div>
+    <div class="panel-tabs">
+      <button class="tab active" data-tab="face">捏脸</button>
+      <button class="tab" data-tab="outfit">换装</button>
+      <button class="tab" data-tab="chat">对话</button>
+      <button class="tab" data-tab="settings">设置</button>
+    </div>
+
+    <div class="tab-content" id="tab-face">
+      <h4>眼睛</h4>
+      <div class="option-grid" id="opt-eyes"></div>
+      <h4>嘴巴</h4>
+      <div class="option-grid" id="opt-mouth"></div>
+      <h4>发型</h4>
+      <div class="option-grid" id="opt-hair"></div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-outfit">
+      <h4>上衣</h4>
+      <div class="option-grid" id="opt-top"></div>
+      <h4>配饰</h4>
+      <div class="option-grid" id="opt-accessory"></div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-chat">
+      <div id="chat-log" class="chat-log"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="和我聊天吧\~" maxlength="500" />
+        <button id="send-btn" class="btn-primary">发送</button>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-settings">
+      <label class="switch-row">
+        <span>自主互动</span>
+        <input type="checkbox" id="auto-act" checked />
+      </label>
+      <label class="switch-row">
+        <span>自主换装</span>
+        <input type="checkbox" id="auto-change" checked />
+      </label>
+      <label class="switch-row">
+        <span>总是置顶感（固定位置）</span>
+        <input type="checkbox" id="fixed-pos" />
+      </label>
+      <button id="reset-pet" class="btn-secondary">重置外观</button>
+      <p class="hint">状态保存在本地浏览器，部署到 Cloudflare 后即可使用 Workers AI 对话。</p>
+    </div>
+  </div>
+
+  <!-- 快速聊天条（底部） -->
+  <div id="quick-chat" class="quick-chat">
+    <input type="text" id="quick-input" placeholder="按 Enter 快速对话..." />
+  </div>
+
+  <!-- 提示 -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
