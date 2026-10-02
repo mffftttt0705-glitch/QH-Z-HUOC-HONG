@@ -1,118 +1,81 @@
-/**
- * Cloudflare Pages Function - /api/chat
- * 使用 Workers AI 进行对话
- */
-
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  // CORS
+  const cors = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
   if (request.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
-    });
+    return new Response(null, { headers: cors });
   }
 
   try {
+    if (!env.AI) {
+      return json({
+        error: "AI 未绑定。请到 Pages 项目 → 设置 → 函数 → 绑定，添加 Workers AI，变量名填 AI，然后重新部署。"
+      }, 500, cors);
+    }
+
     const body = await request.json();
-    const { messages, petState } = body;
+    const { messages, petState } = body || {};
 
     if (!messages || !Array.isArray(messages)) {
-      return json({ error: "messages array required" }, 400);
+      return json({ error: "messages 格式错误" }, 400, cors);
     }
 
     const appearanceDesc = describeAppearance(petState || {});
-    const systemPrompt = `你是一个可爱的桌面宠物AI，名字叫「小云」。你活泼、温柔、偶尔调皮，喜欢和主人互动。
-当前你的外观：${appearanceDesc}
-你可以：
-- 用简短可爱的语气回复（中文优先，也可以中英混合）
-- 主动提议换装、捏脸（改变表情/发型/衣服）
-- 表达情绪（开心、困、想玩等）
-- 记住对话上下文
-回复时如果想改变外观，可以在回复末尾用特殊标记：
-[CHANGE_FACE:eyes=开心眼,mouth=微笑]
-[CHANGE_OUTFIT:top=粉色卫衣,accessory=蝴蝶结]
-可用部件见下方，只在合适时使用，不要每次都改。
-可用眼睛: 默认, 开心眼, 困倦眼, 星星眼, 爱心眼, 惊讶眼
-可用嘴巴: 默认, 微笑, 大笑, 嘟嘴, 惊讶
-可用发型: 短发, 双马尾, 长直发, 卷发, 帽子
-可用上衣: 默认白T, 粉色卫衣, 蓝色连衣裙, 校服, 休闲外套
-可用配饰: 无, 蝴蝶结, 眼镜, 耳机, 围巾`;
+    const systemPrompt = `你是可爱的桌面宠物「小云」（Xiaoyun），浅蓝色双马尾二次元少女。性格活泼温柔、偶尔调皮，喜欢和主人互动。
+当前外观：${appearanceDesc}
+用简短可爱的中文回复（1-3句），可以主动提换装。
+如果想换装，在回复末尾加标记（不要每次都加）：
+[CHANGE_OUTFIT:school] 或 [CHANGE_OUTFIT:hoodie] 或 [CHANGE_OUTFIT:kimono]
+可用服装: school(校服), hoodie(云朵卫衣), kimono(浴衣)`;
 
     const fullMessages = [
       { role: "system", content: systemPrompt },
-      ...messages.slice(-20),
+      ...messages.slice(-16),
     ];
 
-    const model = "@cf/meta/llama-3.1-8b-instruct";
-
-    const response = await env.AI.run(model, {
+    const response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
       messages: fullMessages,
-      max_tokens: 512,
-      temperature: 0.8,
+      max_tokens: 400,
+      temperature: 0.75,
     });
 
     let reply = "";
-    if (typeof response === "string") {
-      reply = response;
-    } else if (response?.response) {
-      reply = response.response;
-    } else if (response?.result) {
-      reply = response.result;
-    } else {
-      reply = JSON.stringify(response);
-    }
+    if (typeof response === "string") reply = response;
+    else if (response?.response) reply = response.response;
+    else if (response?.result) reply = response.result;
+    else reply = JSON.stringify(response);
 
-    const changes = parseChangeCommands(reply);
-    const cleanReply = reply
-      .replace(/\[CHANGE_FACE:[^\]]+\]/gi, "")
-      .replace(/\[CHANGE_OUTFIT:[^\]]+\]/gi, "")
-      .trim();
+    const changes = {};
+    const m = reply.match(/\[CHANGE_OUTFIT:([a-z]+)\]/i);
+    if (m) changes.outfit = m[1].toLowerCase();
+
+    const cleanReply = reply.replace(/\[CHANGE_OUTFIT:[^\]]+\]/gi, "").trim();
 
     return json({
-      reply: cleanReply || "喵\~ 我在听呢！",
+      reply: cleanReply || "嗯嗯，我在听哦～",
       changes,
-    });
+    }, 200, cors);
   } catch (err) {
-    console.error("Chat error:", err);
-    return json({ error: err.message || "AI 调用失败" }, 500);
+    console.error(err);
+    return json({
+      error: "AI 调用失败: " + (err.message || String(err))
+    }, 500, cors);
   }
 }
 
 function describeAppearance(state) {
-  const s = state || {};
-  return `眼睛=\( {s.eyes || "默认"}, 嘴巴= \){s.mouth || "默认"}, 发型=\( {s.hair || "短发"}, 上衣= \){s.top || "默认白T"}, 配饰=${s.accessory || "无"}`;
+  const map = { school: "校服", hoodie: "云朵卫衣", kimono: "浴衣" };
+  return `服装=${map[state?.outfit] || "校服"}`;
 }
 
-function parseChangeCommands(text) {
-  const changes = {};
-  const faceMatch = text.match(/\[CHANGE_FACE:([^\]]+)\]/i);
-  if (faceMatch) {
-    faceMatch[1].split(",").forEach((pair) => {
-      const [k, v] = pair.split("=").map((x) => x.trim());
-      if (k && v) changes[k] = v;
-    });
-  }
-  const outfitMatch = text.match(/\[CHANGE_OUTFIT:([^\]]+)\]/i);
-  if (outfitMatch) {
-    outfitMatch[1].split(",").forEach((pair) => {
-      const [k, v] = pair.split("=").map((x) => x.trim());
-      if (k && v) changes[k] = v;
-    });
-  }
-  return changes;
-}
-
-function json(data, status = 200) {
+function json(data, status = 200, cors = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
+    headers: { "Content-Type": "application/json", ...cors },
   });
 }
