@@ -311,11 +311,25 @@ async function sendChat(text) {
       }),
     });
 
-    const data = await res.json();
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      const snippet = (raw || "").slice(0, 80).replace(/\s+/g, " ");
+      const msg = res.status === 404
+        ? "接口 404：请确认已上传 functions/api/chat.js 并重新部署 Pages"
+        : `服务返回非 JSON（HTTP ${res.status}）${snippet ? "：" + snippet : ""}`;
+      addChatMsg("ai", msg);
+      showBubble(msg, 9000);
+      playAnim("happy", 400);
+      return;
+    }
 
-    if (data.error) {
-      addChatMsg("ai", data.error);
-      showBubble(data.error, 8000);
+    if (!res.ok || data?.error) {
+      const msg = data?.error || `请求失败 HTTP ${res.status}`;
+      addChatMsg("ai", msg);
+      showBubble(msg, 9000);
       playAnim("happy", 400);
       return;
     }
@@ -332,9 +346,9 @@ async function sendChat(text) {
     }
   } catch (err) {
     console.error(err);
-    const msg = "网络请求失败，请确认已部署 functions/api/chat.js 并绑定 Workers AI";
+    const msg = "网络异常：" + (err.message || "请检查网络，并确认 Pages 已部署 functions/api/chat.js、绑定 Workers AI（变量名 AI）");
     addChatMsg("ai", msg);
-    showBubble(msg, 6000);
+    showBubble(msg, 9000);
   } finally {
     sendBtn.disabled = false;
     petEl.classList.remove("thinking");
