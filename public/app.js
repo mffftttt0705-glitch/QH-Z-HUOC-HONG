@@ -17,6 +17,7 @@ let isDragging = false;
 let dragOffset = { x: 0, y: 0 };
 let autoTimer = null;
 let bubbleTimer = null;
+let animTimer = null;
 
 const petEl = document.getElementById("pet");
 const petImg = document.getElementById("pet-img");
@@ -34,8 +35,10 @@ function init() {
   positionPet();
   bindEvents();
   startAutoBehavior();
+  startIdleAnim();
   addChatMsg("system", "小云已上线～ 拖我移动，双击打开面板");
   showBubble("你好呀主人～ ☁️", 3000);
+  playAnim("wave");
 }
 
 function loadState() {
@@ -54,9 +57,11 @@ function positionPet() {
   if (state.x != null && state.y != null) {
     petEl.style.left = state.x + "px";
     petEl.style.top = state.y + "px";
+    petEl.style.right = "auto";
+    petEl.style.bottom = "auto";
   } else {
-    petEl.style.right = "20px";
-    petEl.style.bottom = "100px";
+    petEl.style.right = "16px";
+    petEl.style.bottom = "max(100px, env(safe-area-inset-bottom, 0px) + 80px)";
     petEl.style.left = "auto";
     petEl.style.top = "auto";
   }
@@ -82,8 +87,7 @@ function setOutfit(name) {
   state.outfit = name;
   applyOutfit();
   saveState();
-  petEl.classList.add("happy");
-  setTimeout(() => petEl.classList.remove("happy"), 500);
+  playAnim("spin");
 }
 
 function setBg(name) {
@@ -92,26 +96,45 @@ function setBg(name) {
   saveState();
 }
 
+/** 播放 2D 动作：bounce / sway / wave / jump / spin / idle / happy / thinking */
+function playAnim(name, duration = 800) {
+  const classes = ["happy", "thinking", "wave", "jump", "spin", "bounce-strong"];
+  classes.forEach((c) => petEl.classList.remove(c));
+  clearTimeout(animTimer);
+  if (name === "idle") return;
+  petEl.classList.add(name === "happy" ? "happy" : name);
+  animTimer = setTimeout(() => {
+    petEl.classList.remove(name === "happy" ? "happy" : name);
+  }, duration);
+}
+
+function startIdleAnim() {
+  // 轻微呼吸由 CSS 持续，无需 JS
+}
+
 function bindEvents() {
+  // 拖动：支持鼠标 + 触摸
   petEl.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
     isDragging = true;
     petEl.setPointerCapture(e.pointerId);
     const rect = petEl.getBoundingClientRect();
     dragOffset.x = e.clientX - rect.left;
     dragOffset.y = e.clientY - rect.top;
-    // 清除 right/bottom，改用 left/top
     petEl.style.right = "auto";
     petEl.style.bottom = "auto";
     petEl.style.left = rect.left + "px";
     petEl.style.top = rect.top + "px";
+    petEl.classList.add("dragging");
     e.preventDefault();
   });
 
   petEl.addEventListener("pointermove", (e) => {
     if (!isDragging) return;
-    const x = Math.max(0, Math.min(window.innerWidth - petEl.offsetWidth, e.clientX - dragOffset.x));
-    const y = Math.max(0, Math.min(window.innerHeight - petEl.offsetHeight, e.clientY - dragOffset.y));
+    const maxX = window.innerWidth - petEl.offsetWidth;
+    const maxY = window.innerHeight - petEl.offsetHeight;
+    const x = Math.max(0, Math.min(maxX, e.clientX - dragOffset.x));
+    const y = Math.max(0, Math.min(maxY, e.clientY - dragOffset.y));
     petEl.style.left = x + "px";
     petEl.style.top = y + "px";
   });
@@ -119,12 +142,17 @@ function bindEvents() {
   petEl.addEventListener("pointerup", (e) => {
     if (!isDragging) return;
     isDragging = false;
+    petEl.classList.remove("dragging");
     try { petEl.releasePointerCapture(e.pointerId); } catch {}
-    state.x = parseInt(petEl.style.left) || 0;
-    state.y = parseInt(petEl.style.top) || 0;
+    state.x = parseInt(petEl.style.left, 10) || 0;
+    state.y = parseInt(petEl.style.top, 10) || 0;
     saveState();
-    petEl.classList.add("happy");
-    setTimeout(() => petEl.classList.remove("happy"), 400);
+    playAnim("happy", 500);
+  });
+
+  petEl.addEventListener("pointercancel", () => {
+    isDragging = false;
+    petEl.classList.remove("dragging");
   });
 
   petEl.addEventListener("contextmenu", (e) => {
@@ -132,6 +160,22 @@ function bindEvents() {
     openPanel();
   });
   petEl.addEventListener("dblclick", openPanel);
+
+  // 单击也可打开（移动端双击不便）——短按未拖动则打开
+  let tapStart = 0;
+  let tapMoved = false;
+  petEl.addEventListener("pointerdown", () => {
+    tapStart = Date.now();
+    tapMoved = false;
+  });
+  petEl.addEventListener("pointermove", () => { tapMoved = true; });
+  petEl.addEventListener("pointerup", () => {
+    if (!tapMoved && Date.now() - tapStart < 250) {
+      // 轻点：随机动作 + 可选打开面板（长按/双击更稳）
+      const acts = ["wave", "jump", "happy"];
+      playAnim(acts[Math.floor(Math.random() * acts.length)], 700);
+    }
+  });
 
   document.getElementById("close-panel").onclick = closePanel;
   document.querySelectorAll(".tab").forEach((tab) => {
@@ -173,8 +217,8 @@ function bindEvents() {
     state.y = null;
     petEl.style.left = "auto";
     petEl.style.top = "auto";
-    petEl.style.right = "20px";
-    petEl.style.bottom = "100px";
+    petEl.style.right = "16px";
+    petEl.style.bottom = "max(100px, env(safe-area-inset-bottom, 0px) + 80px)";
     saveState();
     toast("位置已重置");
   };
@@ -184,10 +228,27 @@ function bindEvents() {
       closePanel();
     }
   });
+
+  // 窗口变化时限制位置
+  window.addEventListener("resize", () => {
+    if (state.x == null) return;
+    const maxX = window.innerWidth - petEl.offsetWidth;
+    const maxY = window.innerHeight - petEl.offsetHeight;
+    state.x = Math.max(0, Math.min(maxX, state.x));
+    state.y = Math.max(0, Math.min(maxY, state.y));
+    petEl.style.left = state.x + "px";
+    petEl.style.top = state.y + "px";
+    saveState();
+  });
 }
 
-function openPanel() { panelEl.classList.remove("hidden"); }
-function closePanel() { panelEl.classList.add("hidden"); }
+function openPanel() {
+  panelEl.classList.remove("hidden");
+  playAnim("wave", 600);
+}
+function closePanel() {
+  panelEl.classList.add("hidden");
+}
 
 function showBubble(text, duration = 4500) {
   bubbleEl.textContent = text;
@@ -207,11 +268,12 @@ function startAutoBehavior() {
       "主人在忙什么呀？",
       "记得休息一下～",
       "我在这里陪你哦",
+      "点我可以拖动哦～",
     ];
     showBubble(lines[Math.floor(Math.random() * lines.length)]);
-    petEl.classList.add("happy");
-    setTimeout(() => petEl.classList.remove("happy"), 500);
-  }, 50000 + Math.random() * 25000);
+    const acts = ["wave", "jump", "happy", "spin"];
+    playAnim(acts[Math.floor(Math.random() * acts.length)], 900);
+  }, 45000 + Math.random() * 30000);
 }
 
 function stopAutoBehavior() {
@@ -236,7 +298,7 @@ async function sendChat(text) {
   chatHistory.push({ role: "user", content: text });
 
   sendBtn.disabled = true;
-  petEl.classList.add("thinking");
+  playAnim("thinking", 15000);
   showBubble("思考中…", 12000);
 
   try {
@@ -254,6 +316,7 @@ async function sendChat(text) {
     if (data.error) {
       addChatMsg("ai", data.error);
       showBubble(data.error, 8000);
+      playAnim("happy", 400);
       return;
     }
 
@@ -261,6 +324,7 @@ async function sendChat(text) {
     addChatMsg("ai", reply);
     chatHistory.push({ role: "assistant", content: reply });
     showBubble(reply, 6000);
+    playAnim("wave", 800);
 
     if (data.changes?.outfit && OUTFITS[data.changes.outfit]) {
       setOutfit(data.changes.outfit);
@@ -268,7 +332,7 @@ async function sendChat(text) {
     }
   } catch (err) {
     console.error(err);
-    const msg = "网络请求失败，请检查是否已部署 functions/api/chat.js";
+    const msg = "网络请求失败，请确认已部署 functions/api/chat.js 并绑定 Workers AI";
     addChatMsg("ai", msg);
     showBubble(msg, 6000);
   } finally {
