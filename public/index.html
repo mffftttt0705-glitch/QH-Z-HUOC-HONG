@@ -2,15 +2,17 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#a78bfa" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="description" content="小云 - 桌宠 AI" />
   <title>小云 · 桌宠 AI</title>
   <link rel="stylesheet" href="/style.css" />
   <link rel="manifest" href="/manifest.json" />
 </head>
 <body class="bg-default">
-  <div id="pet" class="pet" title="拖我移动 · 双击打开面板">
+  <div id="pet" class="pet" title="拖我移动 · 轻点做动作 · 双击打开面板">
     <img id="pet-img" src="/xiaoyun-school.png" alt="小云" draggable="false" />
     <div id="bubble" class="bubble hidden"></div>
   </div>
@@ -18,26 +20,26 @@
   <div id="panel" class="panel hidden">
     <div class="panel-header">
       <span>☁️ 小云</span>
-      <button id="close-panel" class="btn-icon">✕</button>
+      <button id="close-panel" class="btn-icon" type="button">✕</button>
     </div>
     <div class="panel-tabs">
-      <button class="tab active" data-tab="outfit">换装</button>
-      <button class="tab" data-tab="bg">背景</button>
-      <button class="tab" data-tab="chat">对话</button>
-      <button class="tab" data-tab="settings">设置</button>
+      <button class="tab active" data-tab="outfit" type="button">换装</button>
+      <button class="tab" data-tab="bg" type="button">背景</button>
+      <button class="tab" data-tab="chat" type="button">对话</button>
+      <button class="tab" data-tab="settings" type="button">设置</button>
     </div>
 
     <div class="tab-content" id="tab-outfit">
       <div class="outfit-grid">
-        <button class="outfit-btn active" data-outfit="school">
+        <button class="outfit-btn active" data-outfit="school" type="button">
           <img src="/xiaoyun-school.png" alt="校服" />
           <span>校服</span>
         </button>
-        <button class="outfit-btn" data-outfit="hoodie">
+        <button class="outfit-btn" data-outfit="hoodie" type="button">
           <img src="/xiaoyun-hoodie.png" alt="卫衣" />
           <span>卫衣</span>
         </button>
-        <button class="outfit-btn" data-outfit="kimono">
+        <button class="outfit-btn" data-outfit="kimono" type="button">
           <img src="/xiaoyun-kimono.png" alt="浴衣" />
           <span>浴衣</span>
         </button>
@@ -46,20 +48,20 @@
 
     <div class="tab-content hidden" id="tab-bg">
       <div class="bg-grid">
-        <button class="bg-btn active" data-bg="default">默认</button>
-        <button class="bg-btn" data-bg="sunset">黄昏</button>
-        <button class="bg-btn" data-bg="night">夜空</button>
-        <button class="bg-btn" data-bg="sakura">樱花</button>
-        <button class="bg-btn" data-bg="room">房间</button>
-        <button class="bg-btn" data-bg="pure">纯白</button>
+        <button class="bg-btn active" data-bg="default" type="button">默认</button>
+        <button class="bg-btn" data-bg="sunset" type="button">黄昏</button>
+        <button class="bg-btn" data-bg="night" type="button">夜空</button>
+        <button class="bg-btn" data-bg="sakura" type="button">樱花</button>
+        <button class="bg-btn" data-bg="room" type="button">房间</button>
+        <button class="bg-btn" data-bg="pure" type="button">纯白</button>
       </div>
     </div>
 
     <div class="tab-content hidden" id="tab-chat">
       <div id="chat-log" class="chat-log"></div>
       <div class="chat-input-row">
-        <input type="text" id="chat-input" placeholder="和我聊天吧\~" maxlength="500" />
-        <button id="send-btn" class="btn-primary">发送</button>
+        <input type="text" id="chat-input" placeholder="和我聊天吧~" maxlength="500" enterkeyhint="send" />
+        <button id="send-btn" class="btn-primary" type="button">发送</button>
       </div>
     </div>
 
@@ -72,13 +74,18 @@
         <span>隐藏底部输入框</span>
         <input type="checkbox" id="hide-quick" />
       </label>
-      <button id="reset-pos" class="btn-secondary">重置位置</button>
-      <p class="hint">对话失败时请检查 Pages 是否已绑定 Workers AI（变量名 AI）。立绘请放在 public 目录。</p>
+      <button id="reset-pos" class="btn-secondary" type="button">重置位置</button>
+      <p class="hint">
+        对话失败：请确认 Cloudflare Pages 已绑定 Workers AI（变量名 AI），并重新部署。<br>
+        模型已改为 @cf/zai-org/glm-4.7-flash（原 llama-3.1-8b-instruct 已弃用）。<br>
+        立绘请放在 public：xiaoyun-school.png / hoodie / kimono。<br>
+        操作：拖动人物 · 轻点做动作 · 双击打开面板。
+      </p>
     </div>
   </div>
 
   <div id="quick-chat" class="quick-chat">
-    <input type="text" id="quick-input" placeholder="按 Enter 快速对话..." />
+    <input type="text" id="quick-input" placeholder="按 Enter 快速对话..." enterkeyhint="send" />
   </div>
 
   <div id="toast" class="toast hidden"></div>
