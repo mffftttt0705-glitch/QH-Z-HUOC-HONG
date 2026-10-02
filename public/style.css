@@ -5,17 +5,22 @@
   --muted: #64748b;
   --bubble: #fff8e7;
   --shadow: 0 10px 40px rgba(91, 124, 250, 0.25);
+  --pet-size: 160px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   color: var(--text);
   user-select: none;
+  -webkit-user-select: none;
   transition: background 0.5s ease;
+  touch-action: manipulation;
 }
 
 /* 背景 */
@@ -38,15 +43,20 @@ body.bg-pure {
   background: #f8fafc;
 }
 
-/* 桌宠 */
+/* 桌宠 - 可拖动 */
 .pet {
   position: fixed;
-  width: 180px;
+  width: var(--pet-size);
   z-index: 100;
   cursor: grab;
   touch-action: none;
+  transition: filter 0.2s;
 }
-.pet:active { cursor: grabbing; }
+.pet:active,
+.pet.dragging {
+  cursor: grabbing;
+  z-index: 150;
+}
 .pet img {
   width: 100%;
   height: auto;
@@ -54,22 +64,72 @@ body.bg-pure {
   filter: drop-shadow(0 8px 20px rgba(0,0,0,0.15));
   pointer-events: none;
   user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center bottom;
+  animation: breathe 3.2s ease-in-out infinite;
 }
+
+/* —— 2D 动作 —— */
 .pet.happy img {
   animation: bounce 0.5s ease;
 }
 .pet.thinking img {
   animation: sway 1.2s ease-in-out infinite;
 }
+.pet.wave img {
+  animation: wave 0.7s ease;
+}
+.pet.jump img {
+  animation: jump 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pet.spin img {
+  animation: spin 0.7s ease;
+}
+.pet.bounce-strong img {
+  animation: bounceStrong 0.6s ease;
+}
+.pet.dragging img {
+  animation: none;
+  transform: scale(1.05);
+  filter: drop-shadow(0 12px 28px rgba(0,0,0,0.22));
+}
 
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.02); }
+}
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-14px); }
-  60% { transform: translateY(-5px); }
+  30% { transform: translateY(-16px); }
+  60% { transform: translateY(-6px); }
+}
+@keyframes bounceStrong {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-22px) scale(1.05); }
+  70% { transform: translateY(-8px) scale(0.98); }
 }
 @keyframes sway {
-  0%, 100% { transform: rotate(-2deg); }
-  50% { transform: rotate(2deg); }
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-12deg); }
+  40% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(5deg); }
+}
+@keyframes jump {
+  0% { transform: translateY(0) scale(1, 1); }
+  30% { transform: translateY(-28px) scale(0.95, 1.05); }
+  50% { transform: translateY(-32px) scale(1.02, 0.98); }
+  80% { transform: translateY(-4px) scale(1.05, 0.95); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(1); }
 }
 
 /* 气泡 */
@@ -83,7 +143,7 @@ body.bg-pure {
   padding: 10px 14px;
   border-radius: 16px;
   font-size: 13px;
-  max-width: 200px;
+  max-width: min(200px, 70vw);
   text-align: center;
   box-shadow: var(--shadow);
   white-space: pre-wrap;
@@ -103,16 +163,17 @@ body.bg-pure {
 }
 .bubble.hidden { display: none; }
 
-/* 面板 */
+/* 面板 - 手机友好 */
 .panel {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   width: min(340px, 92vw);
-  max-height: 78vh;
-  background: rgba(255,255,255,0.95);
+  max-height: min(78vh, 560px);
+  background: rgba(255,255,255,0.96);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 20px;
   box-shadow: var(--shadow);
   z-index: 200;
@@ -131,6 +192,7 @@ body.bg-pure {
   background: linear-gradient(90deg, #7c9cff, #a78bfa);
   color: white;
   font-weight: 600;
+  flex-shrink: 0;
 }
 .btn-icon {
   background: transparent;
@@ -139,20 +201,24 @@ body.bg-pure {
   font-size: 18px;
   cursor: pointer;
   padding: 4px 8px;
+  min-width: 36px;
+  min-height: 36px;
 }
 
 .panel-tabs {
   display: flex;
   border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 .tab {
   flex: 1;
-  padding: 10px 4px;
+  padding: 12px 4px;
   border: none;
   background: transparent;
   cursor: pointer;
   font-size: 13px;
   color: var(--muted);
+  min-height: 44px;
 }
 .tab.active {
   color: var(--primary-dark);
@@ -164,7 +230,7 @@ body.bg-pure {
   padding: 14px;
   overflow-y: auto;
   flex: 1;
-  max-height: 48vh;
+  -webkit-overflow-scrolling: touch;
 }
 .tab-content.hidden { display: none; }
 
@@ -182,10 +248,11 @@ body.bg-pure {
   cursor: pointer;
   text-align: center;
   transition: all 0.15s;
+  min-height: 44px;
 }
 .outfit-btn img {
   width: 100%;
-  height: 90px;
+  height: 80px;
   object-fit: contain;
   display: block;
   margin-bottom: 4px;
@@ -203,12 +270,13 @@ body.bg-pure {
   gap: 8px;
 }
 .bg-btn {
-  padding: 12px 8px;
+  padding: 14px 8px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
   background: white;
   cursor: pointer;
   font-size: 13px;
+  min-height: 44px;
 }
 .bg-btn.active {
   border-color: var(--primary-dark);
@@ -219,12 +287,13 @@ body.bg-pure {
 
 /* 聊天 */
 .chat-log {
-  height: 200px;
+  height: min(200px, 32vh);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
 }
 .msg {
   max-width: 85%;
@@ -256,11 +325,12 @@ body.bg-pure {
 }
 .chat-input-row input {
   flex: 1;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 16px; /* 防止 iOS 缩放 */
   outline: none;
+  min-height: 44px;
 }
 .btn-primary {
   padding: 10px 14px;
@@ -270,28 +340,32 @@ body.bg-pure {
   border-radius: 12px;
   cursor: pointer;
   font-weight: 600;
+  min-height: 44px;
+  min-width: 64px;
 }
 .btn-primary:disabled { opacity: 0.5; }
 .btn-secondary {
   margin-top: 12px;
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   cursor: pointer;
   font-size: 13px;
+  min-height: 44px;
 }
 
 .switch-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: 12px 0;
   font-size: 14px;
   border-bottom: 1px solid #f1f5f9;
+  min-height: 48px;
 }
-.switch-row input { width: 18px; height: 18px; accent-color: var(--primary-dark); }
+.switch-row input { width: 20px; height: 20px; accent-color: var(--primary-dark); }
 .hint {
   margin-top: 12px;
   font-size: 11px;
@@ -299,30 +373,31 @@ body.bg-pure {
   line-height: 1.5;
 }
 
-/* 快速输入 */
+/* 快速输入 - 适配底部安全区 */
 .quick-chat {
   position: fixed;
-  bottom: 16px;
+  bottom: calc(12px + var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%);
-  width: min(380px, 90vw);
+  width: min(380px, calc(100vw - 24px));
   z-index: 50;
 }
 .quick-chat.hidden { display: none; }
 .quick-chat input {
   width: 100%;
-  padding: 12px 18px;
+  padding: 14px 18px;
   border: none;
   border-radius: 24px;
   background: white;
   box-shadow: var(--shadow);
-  font-size: 14px;
+  font-size: 16px;
   outline: none;
+  min-height: 48px;
 }
 
 .toast {
   position: fixed;
-  top: 20px;
+  top: max(20px, env(safe-area-inset-top, 0px) + 12px);
   left: 50%;
   transform: translateX(-50%);
   background: #1e1b4b;
@@ -331,10 +406,51 @@ body.bg-pure {
   border-radius: 12px;
   font-size: 13px;
   z-index: 300;
+  max-width: 90vw;
 }
 .toast.hidden { display: none; }
 
+/* —— 手机适配 —— */
 @media (max-width: 480px) {
-  .pet { width: 140px; }
-  .outfit-btn img { height: 70px; }
+  :root {
+    --pet-size: 120px;
+  }
+  .panel {
+    width: min(100vw - 16px, 360px);
+    max-height: min(85dvh, 90vh);
+    border-radius: 16px;
+  }
+  .tab-content {
+    padding: 12px;
+  }
+  .outfit-btn img {
+    height: 64px;
+  }
+  .chat-log {
+    height: min(180px, 28vh);
+  }
+  .bubble {
+    font-size: 12px;
+    max-width: min(160px, 55vw);
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  :root {
+    --pet-size: 100px;
+  }
+}
+
+/* 横屏手机 */
+@media (max-height: 480px) and (orientation: landscape) {
+  :root {
+    --pet-size: 90px;
+  }
+  .panel {
+    max-height: 92vh;
+  }
+  .chat-log {
+    height: 120px;
+  }
 }
