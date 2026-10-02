@@ -1,0 +1,14 @@
+{
+  "name": "desktop-pet-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "可爱桌宠 AI，支持 Cloudflare Workers 一键部署（GitHub 连接）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
